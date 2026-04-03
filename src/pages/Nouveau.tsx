@@ -4,6 +4,8 @@ import { supabase, N8N_WEBHOOK } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useProfile } from '../contexts/ProfileContext'
 import { LexLogo } from '../components/LexLogo'
+import { ProfileDropdown } from '../components/ui/profile-dropdown'
+import { Footer } from '../components/ui/footer'
 import { toast } from 'sonner'
 import { Upload, X, Loader2, ArrowLeft } from 'lucide-react'
 
@@ -20,8 +22,14 @@ async function extractDocxText(file: File): Promise<string> {
   }
 }
 
+const TONE_CONFIG = {
+  'Amiable': { color: '#6cc4a0', border: 'rgba(40,90,72,0.5)', bg: 'rgba(40,90,72,0.15)', desc: 'Ton cordial, solution à l\'amiable' },
+  'Ferme': { color: '#e6b050', border: 'rgba(180,120,20,0.5)', bg: 'rgba(180,120,20,0.12)', desc: 'Ton professionnel et assertif' },
+  'Très ferme': { color: '#f08080', border: 'rgba(180,40,40,0.5)', bg: 'rgba(180,40,40,0.12)', desc: 'Ton strict, dernière mise en garde' },
+}
+
 export default function Nouveau() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
 
@@ -48,12 +56,9 @@ export default function Nouveau() {
       toast.error('Veuillez remplir tous les champs obligatoires.')
       return
     }
-
     setGenerating(true)
     toast.loading('Génération en cours…', { id: 'gen' })
-
     try {
-      // Extract text from uploaded pieces
       let faitsExtraits = ''
       for (const file of pieceFiles) {
         if (file.name.endsWith('.docx')) {
@@ -64,8 +69,6 @@ export default function Nouveau() {
           if (text) faitsExtraits += `\n\n--- ${file.name} ---\n${text}`
         }
       }
-
-      // Fetch style reference
       let styleIntroduction = profile.introduction || ''
       if (user) {
         const { data: styleFile } = await supabase
@@ -77,32 +80,20 @@ export default function Nouveau() {
           .maybeSingle()
         if (styleFile?.contenu_extrait) styleIntroduction = styleFile.contenu_extrait
       }
-
-      // Call n8n webhook
       const response = await fetch(N8N_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName,
-          opposingParty,
-          litigeSummary,
-          amount,
-          deadline,
-          tone,
+          clientName, opposingParty, litigeSummary, amount, deadline, tone,
           nom: profile.nom || '',
           introduction: styleIntroduction,
           faits_extraits: faitsExtraits.trim(),
         }),
       })
-
       if (!response.ok) throw new Error(`Erreur webhook: ${response.status}`)
-
       const data = await response.json()
       const contenuGenere = data.content || data.med_text || data.text || JSON.stringify(data)
-
       if (!contenuGenere) throw new Error('Aucun contenu reçu')
-
-      // Save to Supabase
       const { data: doc, error } = await supabase
         .from('documents')
         .insert({
@@ -118,9 +109,7 @@ export default function Nouveau() {
         })
         .select()
         .single()
-
       if (error) throw error
-
       toast.success('Mise en demeure générée !', { id: 'gen' })
       navigate(`/document/${doc.id}`)
     } catch (err) {
@@ -130,41 +119,78 @@ export default function Nouveau() {
     }
   }
 
+  const handleSignOut = async () => { await signOut(); navigate('/login') }
+
+  const SectionCard = ({ step, title, children }: { step: string; title: string; children: React.ReactNode }) => (
+    <div className="rounded-[0.75rem] p-6 space-y-4" style={{ background: '#0f1f1d', border: '1px solid #1e3b32' }}>
+      <div className="flex items-center gap-3">
+        <div className="step-number">{step}</div>
+        <p className="font-semibold text-[15px]" style={{ color: '#F0F4F2' }}>{title}</p>
+      </div>
+      {children}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border px-6 py-4 flex items-center gap-4 sticky top-0 z-10">
-        <Link to="/dashboard" className="p-2 rounded-lg hover:bg-surface transition-colors">
-          <ArrowLeft size={18} className="text-muted" />
-        </Link>
-        <LexLogo />
+    <div className="min-h-screen flex flex-col" style={{ background: '#091413' }}>
+      <header className="page-header">
+        <div className="flex items-center gap-3">
+          <Link to="/dashboard" className="btn-ghost p-2">
+            <ArrowLeft size={16} />
+          </Link>
+          <LexLogo />
+        </div>
+        <ProfileDropdown name={profile.nom} email={user?.email} onSignOut={handleSignOut} />
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-10">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-text">Nouveau document</h1>
-          <p className="text-muted text-sm mt-1">Remplissez les informations pour générer votre mise en demeure</p>
+          <h1
+            className="text-[26px] font-normal leading-tight tracking-[-0.02em]"
+            style={{ fontFamily: '"DM Serif Display", Georgia, serif', color: '#F0F4F2' }}
+          >
+            Nouveau document
+          </h1>
+          <p className="text-[13px] mt-1" style={{ color: '#8aada4' }}>
+            Remplissez les informations pour générer votre mise en demeure
+          </p>
         </div>
 
-        <form onSubmit={handleGenerate} className="space-y-6">
-          <div className="card p-6 space-y-5">
-            <h2 className="font-medium text-text text-sm uppercase tracking-widest text-muted">Parties</h2>
-
+        <form onSubmit={handleGenerate} className="space-y-4">
+          {/* Step 1 — Parties */}
+          <SectionCard step="1" title="Parties">
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Client <span className="text-red-500">*</span></label>
-              <input className="input-field" placeholder="Nom du client ou de la société" value={clientName} onChange={e => setClientName(e.target.value)} required />
+              <label className="field-label">
+                Client <span style={{ color: '#f08080' }}>*</span>
+              </label>
+              <input
+                className="input-field"
+                placeholder="Nom du client ou de la société"
+                value={clientName}
+                onChange={e => setClientName(e.target.value)}
+                required
+              />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Partie adverse <span className="text-red-500">*</span></label>
-              <input className="input-field" placeholder="Nom de la partie adverse" value={opposingParty} onChange={e => setOpposingParty(e.target.value)} required />
+              <label className="field-label">
+                Partie adverse <span style={{ color: '#f08080' }}>*</span>
+              </label>
+              <input
+                className="input-field"
+                placeholder="Nom de la partie adverse"
+                value={opposingParty}
+                onChange={e => setOpposingParty(e.target.value)}
+                required
+              />
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="card p-6 space-y-5">
-            <h2 className="font-medium text-text text-sm uppercase tracking-widest text-muted">Litige</h2>
-
+          {/* Step 2 — Litige */}
+          <SectionCard step="2" title="Litige">
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Résumé des faits <span className="text-red-500">*</span></label>
+              <label className="field-label">
+                Résumé des faits <span style={{ color: '#f08080' }}>*</span>
+              </label>
               <textarea
                 className="input-field min-h-[120px] resize-y"
                 placeholder="Décrivez le litige, les manquements, les montants en jeu et les tentatives de résolution…"
@@ -174,82 +200,125 @@ export default function Nouveau() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-text mb-2">Montant réclamé</label>
-                <input className="input-field" placeholder="ex: 25000" value={amount} onChange={e => setAmount(e.target.value)} />
+                <label className="field-label">Montant réclamé</label>
+                <input
+                  className="input-field"
+                  placeholder="ex: 25 000 $"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text mb-2">Date limite de réponse</label>
-                <input type="date" className="input-field" value={deadline} onChange={e => setDeadline(e.target.value)} />
+                <label className="field-label">Date limite de réponse</label>
+                <input
+                  type="date"
+                  className="input-field"
+                  value={deadline}
+                  onChange={e => setDeadline(e.target.value)}
+                  style={{ colorScheme: 'dark' }}
+                />
               </div>
             </div>
 
+            {/* Tone picker */}
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Ton</label>
-              <div className="flex gap-3">
-                {['Amiable', 'Ferme', 'Très ferme'].map(t => (
+              <label className="field-label mb-3">Ton</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.entries(TONE_CONFIG) as [string, typeof TONE_CONFIG[keyof typeof TONE_CONFIG]][]).map(([t, cfg]) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setTone(t)}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${
-                      tone === t
-                        ? 'bg-primary text-white border-primary shadow-sm'
-                        : 'bg-white text-text border-border hover:border-primary'
-                    }`}
+                    className="flex flex-col items-start px-3.5 py-3 rounded-[0.75rem] text-left transition-all duration-150"
+                    style={{
+                      background: tone === t ? cfg.bg : 'transparent',
+                      border: `1.5px solid ${tone === t ? cfg.border : '#1e3b32'}`,
+                      boxShadow: tone === t ? `0 0 0 1px ${cfg.border}` : 'none',
+                    }}
                   >
-                    {t}
+                    <span
+                      className="text-[12px] font-semibold leading-none mb-1"
+                      style={{ color: tone === t ? cfg.color : '#F0F4F2' }}
+                    >
+                      {t}
+                    </span>
+                    <span className="text-[11px] leading-snug" style={{ color: '#8aada4' }}>
+                      {cfg.desc}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="card p-6 space-y-4">
-            <h2 className="font-medium text-text text-sm uppercase tracking-widest text-muted">Pièces justificatives</h2>
-            <p className="text-xs text-muted">Contrats, courriels, factures… (.docx ou .txt)</p>
-
+          {/* Step 3 — Pièces */}
+          <SectionCard step="3" title="Pièces justificatives">
+            <p className="text-[12px] -mt-2" style={{ color: '#8aada4' }}>
+              Contrats, courriels, factures… (.docx ou .txt)
+            </p>
             <div
-              className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+              className="rounded-[0.75rem] p-5 text-center cursor-pointer transition-all"
+              style={{ border: '1.5px dashed #1e3b32' }}
               onClick={() => pieceRef.current?.click()}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#285A48'
+                e.currentTarget.style.background = 'rgba(40,90,72,0.04)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#1e3b32'
+                e.currentTarget.style.background = 'transparent'
+              }}
             >
-              <Upload size={24} className="mx-auto text-muted mb-2" />
-              <p className="text-sm text-muted">Cliquez ou glissez vos fichiers ici</p>
-              <p className="text-xs text-muted mt-1">.docx et .txt uniquement</p>
+              <Upload size={20} className="mx-auto mb-2" style={{ color: '#8aada4' }} />
+              <p className="text-[13px]" style={{ color: '#8aada4' }}>Cliquez ou glissez vos fichiers ici</p>
+              <p className="text-[11px] mt-0.5" style={{ color: '#8aada4', opacity: 0.5 }}>.docx et .txt uniquement</p>
               <input ref={pieceRef} type="file" accept=".docx,.txt" multiple className="hidden" onChange={handlePieceAdd} />
             </div>
 
             {pieceFiles.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {pieceFiles.map((file, i) => (
-                  <div key={i} className="flex items-center justify-between bg-surface rounded-lg px-4 py-2.5">
-                    <span className="text-sm text-text">{file.name}</span>
-                    <button type="button" onClick={() => setPieceFiles(prev => prev.filter((_, j) => j !== i))}>
-                      <X size={16} className="text-muted hover:text-text" />
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-[0.75rem] px-3.5 py-2.5"
+                    style={{ background: '#122420', border: '1px solid #1e3b32' }}
+                  >
+                    <span className="text-[13px] truncate" style={{ color: '#F0F4F2' }}>{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPieceFiles(prev => prev.filter((_, j) => j !== i))}
+                      className="ml-3 shrink-0 p-0.5 rounded transition-colors"
+                      style={{ color: '#8aada4' }}
+                    >
+                      <X size={14} />
                     </button>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </SectionCard>
 
+          {/* Generate CTA */}
           <button
             type="submit"
             disabled={generating}
-            className="btn-primary w-full flex items-center justify-center gap-3 py-4 text-base"
+            className="btn-primary w-full flex items-center justify-center gap-2.5 py-4 text-[15px]"
           >
             {generating ? (
               <>
-                <Loader2 size={20} className="animate-spin" />
+                <Loader2 size={17} className="animate-spin" />
                 Génération en cours… (~20s)
               </>
             ) : (
-              'Générer le premier draft →'
+              'Générer la mise en demeure →'
             )}
           </button>
         </form>
       </main>
+
+      <Footer />
     </div>
   )
 }

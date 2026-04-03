@@ -2,28 +2,195 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* ─── CSS Variables ─────────────────────────────────────────── */
+:root {
+  --background: #091413;
+  --foreground: #F0F4F2;
+  --primary: #285A48;
+  --primary-foreground: #FFFFFF;
+  --card: #0f1f1d;
+  --card-foreground: #F0F4F2;
+  --border: #1e3b32;
+  --muted: #122420;
+  --muted-foreground: #8aada4;
+  --accent: #285A48;
+  --accent-foreground: #FFFFFF;
+  --ring: #285A48;
+  --radius: 0.75rem;
+}
+
+/* ─── Base ──────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: 'Inter', 'Helvetica Neue', sans-serif;
-  background-color: #FAFAFA;
-  color: #222222;
-  -webkit-font-smoothing: antialiased;
+  background-color: #091413;
+  color: #F0F4F2;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  margin: 0;
+  min-height: 100vh;
 }
 
+/* ─── Accordion animations ──────────────────────────────────── */
+@keyframes accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+.animate-accordion-down {
+  animation: accordion-down 0.22s ease-out;
+  overflow: hidden;
+}
+.animate-accordion-up {
+  animation: accordion-up 0.22s ease-out;
+  overflow: hidden;
+}
+
+/* ─── Component classes ─────────────────────────────────────── */
 @layer components {
+
+  /* ── Buttons ─────────────────────────── */
   .btn-primary {
-    @apply bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-dark transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+    @apply inline-flex items-center justify-center gap-2 font-semibold text-white rounded-[0.75rem] transition-all duration-150 cursor-pointer select-none;
+    background: linear-gradient(180deg, #2f6b56 0%, #1e4a38 100%);
+    box-shadow:
+      0 0 0 1px rgba(30,74,56,0.8),
+      0 1px 2px rgba(0,0,0,0.3),
+      0 3px 8px rgba(0,0,0,0.2),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+    padding: 10px 20px;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
   }
-  .btn-secondary {
-    @apply bg-white text-text border border-border px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors duration-200 shadow-sm;
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #35785f 0%, #225444 100%);
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px rgba(30,74,56,0.8),
+      0 4px 12px rgba(0,0,0,0.35),
+      0 8px 20px rgba(0,0,0,0.15),
+      inset 0 1px 0 rgba(255,255,255,0.1);
   }
-  .input-field {
-    @apply w-full border border-border rounded-lg px-4 py-3 text-text placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white transition-all duration-200;
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 1px rgba(30,74,56,0.8),
+      0 1px 2px rgba(0,0,0,0.3),
+      inset 0 1px 3px rgba(0,0,0,0.2);
   }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(40,90,72,0.5);
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-[0.75rem] transition-all duration-150 cursor-pointer select-none;
+    background: transparent;
+    border: 1.5px solid #1e3b32;
+    color: #F0F4F2;
+    padding: 9px 18px;
+    font-size: 13.5px;
+  }
+  .btn-outline:hover:not(:disabled) {
+    background: #122420;
+    border-color: #285A48;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-[0.75rem] transition-all duration-150 cursor-pointer select-none;
+    background: transparent;
+    color: #8aada4;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: #122420;
+    color: #F0F4F2;
+  }
+
+  /* ── Cards ───────────────────────────── */
   .card {
-    @apply bg-white border border-border rounded-xl shadow-sm;
+    @apply rounded-[0.75rem];
+    background: #0f1f1d;
+    border: 1px solid #1e3b32;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  .card-interactive {
+    @apply card cursor-pointer transition-all duration-200;
+  }
+  .card-interactive:hover {
+    background: #162925;
+    border-color: #285A48;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    transform: translateY(-1px);
+  }
+
+  /* ── Inputs ──────────────────────────── */
+  .input-field {
+    @apply w-full rounded-[0.75rem] transition-all duration-150 outline-none;
+    background: #122420;
+    border: 1.5px solid #1e3b32;
+    color: #F0F4F2;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .input-field::placeholder {
+    color: #8aada4;
+    opacity: 0.6;
+  }
+  .input-field:focus {
+    border-color: #285A48;
+    box-shadow: 0 0 0 3px rgba(40,90,72,0.25), inset 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  /* ── Labels ──────────────────────────── */
+  .field-label {
+    @apply block font-medium;
+    color: #F0F4F2;
+    font-size: 13px;
+    margin-bottom: 6px;
+    opacity: 0.85;
+  }
+
+  .section-label {
+    @apply block uppercase font-bold tracking-widest;
+    font-size: 10px;
+    color: #8aada4;
+    letter-spacing: 0.12em;
+  }
+
+  /* ── Step numbers ────────────────────── */
+  .step-number {
+    @apply inline-flex items-center justify-center shrink-0 rounded-full font-bold;
+    width: 26px;
+    height: 26px;
+    background: linear-gradient(180deg, #2f6b56 0%, #1e4a38 100%);
+    box-shadow: 0 0 0 1px rgba(40,90,72,0.5);
+    font-size: 11px;
+    color: #fff;
+  }
+
+  /* ── Page header ─────────────────────── */
+  .page-header {
+    @apply sticky top-0 z-20 flex items-center justify-between px-6 h-14;
+    background: rgba(9,20,19,0.95);
+    border-bottom: 1px solid #1e3b32;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }
