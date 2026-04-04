@@ -15,6 +15,15 @@ interface StyleFile {
   created_at: string
 }
 
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[0.75rem] p-6" style={{ background: '#0f1f1d', border: '1px solid #1e3b32' }}>
+      <p className="section-label mb-5">{title}</p>
+      {children}
+    </div>
+  )
+}
+
 export default function Profil() {
   const { user, signOut } = useAuth()
   const { profile, updateProfile } = useProfile()
@@ -23,6 +32,9 @@ export default function Profil() {
   const [nom, setNom] = useState(profile.nom)
   const [domaine, setDomaine] = useState(profile.domaine)
   const [introduction, setIntroduction] = useState(profile.introduction)
+  const [nomCabinet, setNomCabinet] = useState(profile.nom_cabinet)
+  const [adresse, setAdresse] = useState(profile.adresse)
+  const [telephone, setTelephone] = useState(profile.telephone)
   const [styleFiles, setStyleFiles] = useState<StyleFile[]>([])
   const [uploadingStyle, setUploadingStyle] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -32,6 +44,9 @@ export default function Profil() {
     setNom(profile.nom)
     setDomaine(profile.domaine)
     setIntroduction(profile.introduction)
+    setNomCabinet(profile.nom_cabinet)
+    setAdresse(profile.adresse)
+    setTelephone(profile.telephone)
   }, [profile])
 
   useEffect(() => {
@@ -46,7 +61,7 @@ export default function Profil() {
 
   const handleSaveProfile = async () => {
     setSavingProfile(true)
-    await updateProfile({ nom, domaine, introduction })
+    await updateProfile({ nom, domaine, introduction, nom_cabinet: nomCabinet, adresse, telephone })
     setSavingProfile(false)
     toast.success('Profil enregistré')
   }
@@ -107,13 +122,6 @@ export default function Profil() {
   const initials = nom
     ? nom.replace('Me.', '').trim().split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
     : user?.email?.[0]?.toUpperCase() || 'U'
-
-  const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="rounded-[0.75rem] p-6" style={{ background: '#0f1f1d', border: '1px solid #1e3b32' }}>
-      <p className="section-label mb-5">{title}</p>
-      {children}
-    </div>
-  )
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#091413' }}>
@@ -195,6 +203,53 @@ export default function Profil() {
                 <><Loader2 size={14} className="animate-spin" /> Enregistrement…</>
               ) : (
                 <><CheckCircle size={14} /> Enregistrer les modifications</>
+              )}
+            </button>
+          </div>
+        </SectionCard>
+
+        {/* En-tête du cabinet */}
+        <SectionCard title="En-tête du cabinet">
+          <div className="space-y-4">
+            <p className="text-[12px] -mt-3" style={{ color: '#8aada4' }}>
+              Ces informations apparaîtront en haut de chaque document Word exporté
+            </p>
+            <div>
+              <label className="field-label">Nom du cabinet</label>
+              <input
+                className="input-field"
+                placeholder="Cabinet Tremblay & Associés"
+                value={nomCabinet}
+                onChange={e => setNomCabinet(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">Adresse</label>
+              <input
+                className="input-field"
+                placeholder="123 rue Saint-Denis, Montréal, QC H2X 1Z1"
+                value={adresse}
+                onChange={e => setAdresse(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">Téléphone</label>
+              <input
+                className="input-field"
+                placeholder="514 555-0123"
+                value={telephone}
+                onChange={e => setTelephone(e.target.value)}
+              />
+            </div>
+            <button
+              onClick={handleSaveProfile}
+              disabled={savingProfile}
+              className="btn-primary flex items-center gap-2"
+            >
+              {savingProfile ? (
+                <><Loader2 size={14} className="animate-spin" /> Enregistrement…</>
+              ) : (
+                <><CheckCircle size={14} /> Enregistrer</>
               )}
             </button>
           </div>

@@ -49,17 +49,55 @@ export default function DocumentPreview() {
     if (!doc) return
     try {
       const content = doc.contenu_genere
+
+      // Construire l'en-tête du cabinet
+      const headerLines: Paragraph[] = []
+      if (profile.nom) {
+        headerLines.push(new Paragraph({
+          children: [new TextRun({ text: profile.nom, font: 'Times New Roman', size: 24, bold: true })],
+          spacing: { after: 0 },
+        }))
+      }
+      if (profile.nom_cabinet) {
+        headerLines.push(new Paragraph({
+          children: [new TextRun({ text: profile.nom_cabinet, font: 'Times New Roman', size: 24 })],
+          spacing: { after: 0 },
+        }))
+      }
+      if (profile.adresse) {
+        headerLines.push(new Paragraph({
+          children: [new TextRun({ text: profile.adresse, font: 'Times New Roman', size: 24 })],
+          spacing: { after: 0 },
+        }))
+      }
+      if (profile.telephone) {
+        headerLines.push(new Paragraph({
+          children: [new TextRun({ text: `Tél. : ${profile.telephone}`, font: 'Times New Roman', size: 24 })],
+          spacing: { after: 0 },
+        }))
+      }
+      // Séparateur si en-tête présente
+      if (headerLines.length > 0) {
+        headerLines.push(new Paragraph({
+          children: [new TextRun({ text: '─'.repeat(60), font: 'Times New Roman', size: 20, color: '888888' })],
+          spacing: { after: 200 },
+        }))
+      }
+
       const wordDoc = new Document({
         sections: [{
           properties: {
             page: { margin: { top: 1418, right: 1418, bottom: 1418, left: 1418 } },
           },
-          children: content.split('\n').map(line =>
-            new Paragraph({
-              children: [new TextRun({ text: line, font: 'Times New Roman', size: 24 })],
-              spacing: { after: line.trim() === '' ? 0 : 200 },
-            })
-          ),
+          children: [
+            ...headerLines,
+            ...content.split('\n').map(line =>
+              new Paragraph({
+                children: [new TextRun({ text: line, font: 'Times New Roman', size: 24 })],
+                spacing: { after: line.trim() === '' ? 0 : 200 },
+              })
+            ),
+          ],
         }],
       })
       const blob = await Packer.toBlob(wordDoc)
@@ -232,6 +270,23 @@ export default function DocumentPreview() {
           className="max-w-[720px] mx-auto bg-white min-h-[900px] p-[60px] rounded-lg"
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.05)' }}
         >
+          {/* En-tête cabinet */}
+          {(profile.nom || profile.nom_cabinet || profile.adresse || profile.telephone) && (
+            <div className="mb-6 pb-5" style={{ borderBottom: '1px solid #d0d0d0', fontFamily: 'Times New Roman, serif' }}>
+              {profile.nom && (
+                <p className="text-[14.5px] font-bold" style={{ color: '#1A1A1A' }}>{profile.nom}</p>
+              )}
+              {profile.nom_cabinet && (
+                <p className="text-[14px]" style={{ color: '#1A1A1A' }}>{profile.nom_cabinet}</p>
+              )}
+              {profile.adresse && (
+                <p className="text-[14px]" style={{ color: '#1A1A1A' }}>{profile.adresse}</p>
+              )}
+              {profile.telephone && (
+                <p className="text-[14px]" style={{ color: '#1A1A1A' }}>Tél. : {profile.telephone}</p>
+              )}
+            </div>
+          )}
           <div
             className="text-[14.5px] leading-[1.8] whitespace-pre-line"
             style={{ fontFamily: 'Times New Roman, serif', color: '#1A1A1A' }}

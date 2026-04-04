@@ -7,6 +7,9 @@ interface Profile {
   introduction: string
   domaine: string
   onboarded: boolean
+  telephone: string
+  adresse: string
+  nom_cabinet: string
 }
 
 interface ProfileContextType {
@@ -20,6 +23,9 @@ const defaultProfile: Profile = {
   introduction: '',
   domaine: 'Droit civil',
   onboarded: false,
+  telephone: '',
+  adresse: '',
+  nom_cabinet: '',
 }
 
 const ProfileContext = createContext<ProfileContextType | null>(null)
