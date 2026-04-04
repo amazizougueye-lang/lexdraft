@@ -28,6 +28,18 @@ const TONE_CONFIG = {
   'Très ferme': { color: '#f08080', border: 'rgba(180,40,40,0.5)', bg: 'rgba(180,40,40,0.12)', desc: 'Ton strict, dernière mise en garde' },
 }
 
+function SectionCard({ step, title, children }: { step: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[0.75rem] p-6 space-y-4" style={{ background: '#0f1f1d', border: '1px solid #1e3b32' }}>
+      <div className="flex items-center gap-3">
+        <div className="step-number">{step}</div>
+        <p className="font-semibold text-[15px]" style={{ color: '#F0F4F2' }}>{title}</p>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function Nouveau() {
   const { user, signOut } = useAuth()
   const { profile } = useProfile()
@@ -121,15 +133,6 @@ export default function Nouveau() {
 
   const handleSignOut = async () => { await signOut(); navigate('/login') }
 
-  const SectionCard = ({ step, title, children }: { step: string; title: string; children: React.ReactNode }) => (
-    <div className="rounded-[0.75rem] p-6 space-y-4" style={{ background: '#0f1f1d', border: '1px solid #1e3b32' }}>
-      <div className="flex items-center gap-3">
-        <div className="step-number">{step}</div>
-        <p className="font-semibold text-[15px]" style={{ color: '#F0F4F2' }}>{title}</p>
-      </div>
-      {children}
-    </div>
-  )
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#091413' }}>
