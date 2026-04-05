@@ -53,6 +53,8 @@ export default function Nouveau() {
   const [tone, setTone] = useState('Ferme')
   const [pieceFiles, setPieceFiles] = useState<File[]>([])
   const [generating, setGenerating] = useState(false)
+  const [generatingVariants, setGeneratingVariants] = useState(false)
+  const [variantsPreview, setVariantsPreview] = useState<{ ton: string; contenu: string }[] | null>(null)
   const pieceRef = useRef<HTMLInputElement>(null)
 
   const handlePieceAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +130,99 @@ export default function Nouveau() {
       console.error(err)
       toast.error('Erreur lors de la génération. Réessayez.', { id: 'gen' })
       setGenerating(false)
+    }
+  }
+
+  const handleGenerateVariants = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!clientName.trim() || !opposingParty.trim() || !litigeSummary.trim()) {
+      toast.error('Veuillez remplir tous les champs obligatoires.')
+      return
+    }
+    setGeneratingVariants(true)
+    toast.loading('Génération des 3 variantes…', { id: 'variants' })
+    try {
+      let faitsExtraits = ''
+      for (const file of pieceFiles) {
+        if (file.name.endsWith('.docx')) {
+          const text = await extractDocxText(file)
+          if (text) faitsExtraits += `\n\n--- ${file.name} ---\n${text}`
+        } else {
+          const text = await file.text()
+          if (text) faitsExtraits += `\n\n--- ${file.name} ---\n${text}`
+        }
+      }
+      let styleIntroduction = profile.introduction || ''
+      if (user) {
+        const { data: styleFile } = await supabase
+          .from('fichiers_style')
+          .select('contenu_extrait')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (styleFile?.contenu_extrait) styleIntroduction = styleFile.contenu_extrait
+      }
+
+      const tones = ['Amiable', 'Ferme', 'Très ferme']
+      const results = await Promise.all(
+        tones.map(t =>
+          fetch(N8N_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientName, opposingParty, litigeSummary, amount, deadline, tone: t,
+              nom: profile.nom || '',
+              introduction: styleIntroduction,
+              faits_extraits: faitsExtraits.trim(),
+            }),
+          }).then(r => r.json())
+        )
+      )
+
+      const variants = tones.map((t, i) => ({
+        ton: t,
+        contenu: results[i].content || results[i].med_text || results[i].text || JSON.stringify(results[i]),
+      }))
+
+      setVariantsPreview(variants)
+      toast.dismiss('variants')
+      setGeneratingVariants(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Erreur lors de la génération des variantes.', { id: 'variants' })
+      setGeneratingVariants(false)
+    }
+  }
+
+  const handleSelectVariant = async (selectedTon: string) => {
+    if (!variantsPreview) return
+    const selected = variantsPreview.find(v => v.ton === selectedTon)
+    if (!selected) return
+
+    try {
+      const { data: doc, error } = await supabase
+        .from('documents')
+        .insert({
+          user_id: user?.id,
+          titre: `${clientName} c. ${opposingParty}`,
+          nom_client: clientName,
+          partie_adverse: opposingParty,
+          resume_litige: litigeSummary,
+          montant: amount,
+          date_limite: deadline,
+          ton: selected.ton,
+          contenu_genere: selected.contenu,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      toast.success(`Variante "${selected.ton}" sauvegardée !`)
+      setVariantsPreview(null)
+      navigate(`/document/${doc.id}`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Erreur lors de la sauvegarde.')
     }
   }
 
@@ -207,6 +302,7 @@ export default function Nouveau() {
               <div>
                 <label className="field-label">Montant réclamé</label>
                 <input
+                  key="amount-input"
                   className="input-field"
                   placeholder="ex: 25 000 $"
                   value={amount}
@@ -304,21 +400,92 @@ export default function Nouveau() {
           </SectionCard>
 
           {/* Generate CTA */}
-          <button
-            type="submit"
-            disabled={generating}
-            className="btn-primary w-full flex items-center justify-center gap-2.5 py-4 text-[15px]"
-          >
-            {generating ? (
-              <>
-                <Loader2 size={17} className="animate-spin" />
-                Génération en cours… (~20s)
-              </>
-            ) : (
-              'Générer la mise en demeure →'
-            )}
-          </button>
+          <div className="space-y-3">
+            <button
+              type="submit"
+              disabled={generating || generatingVariants}
+              className="btn-primary w-full flex items-center justify-center gap-2.5 py-4 text-[15px]"
+            >
+              {generating ? (
+                <><Loader2 size={17} className="animate-spin" />Génération en cours… (~20s)</>
+              ) : (
+                'Générer la mise en demeure →'
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateVariants}
+              disabled={generating || generatingVariants}
+              className="w-full flex items-center justify-center gap-2.5 py-4 text-[15px] font-medium rounded-[0.75rem] transition-all"
+              style={{ background: 'transparent', border: '1.5px solid #1e3b32', color: '#8aada4' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#285A48'; e.currentTarget.style.color = '#F0F4F2' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#1e3b32'; e.currentTarget.style.color = '#8aada4' }}
+            >
+              {generatingVariants ? (
+                <><Loader2 size={17} className="animate-spin" />Génération des 3 variantes… (~60s)</>
+              ) : (
+                'Générer 3 variantes (Amiable · Ferme · Très ferme)'
+              )}
+            </button>
+            <p className="text-center text-[11px]" style={{ color: '#8aada4', opacity: 0.6 }}>
+              {variantsPreview ? 'Choisissez la variante à sauvegarder' : 'Les 3 variantes s\'afficheront ici pour sélection'}
+            </p>
+          </div>
         </form>
+
+        {/* Variantes Preview Modal */}
+        {variantsPreview && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col" style={{ background: '#0f1f1d' }}>
+              <div className="p-6 border-b" style={{ borderColor: '#1e3b32' }}>
+                <h2 className="text-[20px] font-semibold" style={{ color: '#F0F4F2' }}>Choisissez votre variante</h2>
+                <p className="text-[13px] mt-1" style={{ color: '#8aada4' }}>Sélectionnez le ton qui convient le mieux à votre dossier</p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-3 gap-4 p-6">
+                  {variantsPreview.map(variant => (
+                    <div
+                      key={variant.ton}
+                      className="rounded-lg p-4 cursor-pointer transition-all border-2"
+                      style={{ background: '#122420', border: '2px solid #1e3b32' }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = '#285A48'
+                        e.currentTarget.style.background = 'rgba(40,90,72,0.1)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = '#1e3b32'
+                        e.currentTarget.style.background = '#122420'
+                      }}
+                    >
+                      <p className="text-[14px] font-semibold mb-3" style={{ color: '#6cc4a0' }}>{variant.ton}</p>
+                      <div className="text-[12px] leading-relaxed max-h-[300px] overflow-y-auto mb-4" style={{ color: '#8aada4' }}>
+                        {variant.contenu.split('\n').slice(0, 15).join('\n')}
+                        {variant.contenu.split('\n').length > 15 && '...'}
+                      </div>
+                      <button
+                        onClick={() => handleSelectVariant(variant.ton)}
+                        className="btn-primary w-full py-2 text-[12px]"
+                      >
+                        Sauvegarder
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 border-t flex justify-end gap-2" style={{ borderColor: '#1e3b32' }}>
+                <button
+                  onClick={() => setVariantsPreview(null)}
+                  className="px-4 py-2 rounded-[0.75rem] text-[13px]"
+                  style={{ background: '#122420', border: '1px solid #1e3b32', color: '#8aada4' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <Footer />
